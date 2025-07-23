@@ -1,27 +1,36 @@
-import fs from "fs";
-import { PDFDocument } from "pdf-lib";
-import path from "path";
+import PDFMerger from 'pdf-merger-js';
+import { exec } from 'child_process';
 
-async function unirPDFs(caminhosEntrada, caminhoSaida) {
-  const pdfFinal = await PDFDocument.create();
-
-  for (const arquivo of caminhosEntrada) {
-    const pdfBytes = fs.readFileSync(arquivo);
-    const pdf = await PDFDocument.load(pdfBytes);
-    const paginas = await pdfFinal.copyPages(pdf, pdf.getPageIndices());
-
-    paginas.forEach((pagina) => {
-      pdfFinal.addPage(pagina);
+function limparPDF(input, output) {
+  return new Promise((resolve, reject) => {
+    exec(`pdftk ${input} output ${output}`, (err, stdout, stderr) => {
+      if (err) {
+        console.error('Erro ao limpar PDF:', stderr);
+        return reject(err);
+      }
+      console.log(`PDF salvo sem proteção como ${output}`);
+      resolve();
     });
-  }
-
-  const pdfBytesFinal = await pdfFinal.save();
-  fs.writeFileSync(caminhoSaida, pdfBytesFinal);
-
-  console.log(`PDF unido salvo em: ${caminhoSaida}`);
+  });
 }
 
-unirPDFs(
-  ['./documento_teste_1.pdf', './documento_teste_2.pdf'],
-  './pdfunido.pdf'
-);
+async function unirPDFs() {
+  const merger = new PDFMerger();
+
+  await merger.add('./documento_limpo.pdf');
+  await merger.add('./documento_teste_2.pdf');
+
+  await merger.save('./pdfunido.pdf');
+  console.log("PDF unido com sucesso!");
+}
+
+async function main() {
+  try {
+    await limparPDF('documento_protegido.pdf', 'documento_limpo.pdf');
+    await unirPDFs();
+  } catch (error) {
+    console.error("Falha no processo:", error.message);
+  }
+}
+
+main();
