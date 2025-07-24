@@ -1,5 +1,9 @@
 import PDFMerger from 'pdf-merger-js';
 import { exec, spawn } from 'child_process';
+import fs from 'fs/promises';
+import os from 'os';
+import path from 'path';
+import { randomUUID } from 'crypto';
 
 function isPDFEncrypted(filePath) {
   return new Promise((resolve, reject) => {
@@ -48,38 +52,56 @@ function limparPDF(input, output) {
   });
 }
 
-async function prepararPDF(pdfPath, outputPath) {
-  const encrypted = await isPDFEncrypted(pdfPath);
-  if (encrypted) {
-    //se o pdf for criptografado, vai executar a função de limpar o pdf, caso contrario só vai retornar o caminho do pdf normalmente
-    console.log(`${pdfPath} está criptografado. Descriptografando...`);
-    await limparPDF(pdfPath, outputPath);
-    return outputPath;
+async function prepararPDFBuffer(pdfBuffer, originalName) {
+  const tempDir = os.tmpdir();
+
+  const tempInputPath = path.join(tempDir, `${randomUUID()}-${originalName}`);
+  const tempOutputPath = path.join(tempDir, `cleaned-${originalName}`);
+
+  // Salva o buffer em um arquivo temporário
+  await fs.writeFile(tempInputPath, pdfBuffer);
+
+  const isEncrypted = await isPDFEncrypted(tempInputPath);
+  let finalPath = tempInputPath;
+
+  if (isEncrypted) {
+    console.log(`${originalName} está criptografado. Descriptografando...`);
+    await limparPDF(tempInputPath, tempOutputPath);
+    finalPath = tempOutputPath;
   } else {
-    console.log(`${pdfPath} não está criptografado.`);
-    return pdfPath;
+    console.log(`${originalName} não está criptografado.`);
   }
+
+  // Lê o PDF final como buffer de volta (limpo ou original)
+  const resultBuffer = await fs.readFile(finalPath);
+
+  // Opcional: deletar arquivos temporários
+  // await fs.unlink(tempInputPath);
+  // if (isEncrypted) await fs.unlink(tempOutputPath);
+
+  return resultBuffer;
 }
 
-async function unirPDFs(arquivos, destino) {
-  //criar novo pdf
+async function unirPDFsComBuffer(buffers, destino) {
   const merger = new PDFMerger();
 
-  for (const arquivo of arquivos) {
-    await merger.add(arquivo);
+  for (const buffer of buffers) {
+    await merger.add(buffer);
   }
 
-  //salva o novo pdf
   await merger.save(destino);
   console.log(`PDF unido com sucesso em: ${destino}`);
 }
 
 async function main() {
   try {
-    const doc1 = await prepararPDF('documento_protegido.pdf', 'documento_protegido_limpo.pdf'); //colocar nome dos documentos de entrada e saida
-    const doc2 = await prepararPDF('documento_teste_2.pdf', 'documento_teste_2_limpo.pdf'); //colocar nome dos documentos de entrada e saida
+    const buffer1 = await fs.readFile('./documento_protegido.pdf');
+    const buffer2 = await fs.readFile('./documento_teste_2.pdf');
 
-    await unirPDFs([doc1, doc2], 'pdfunido.pdf');
+    const cleaned1 = await prepararPDFBuffer(buffer1, 'documento_protegido.pdf');
+    const cleaned2 = await prepararPDFBuffer(buffer2, 'documento_teste_2.pdf');
+
+    await unirPDFsComBuffer([cleaned1, cleaned2], 'pdfunido.pdf');
   } catch (error) {
     console.error("Falha no processo:", error.message);
   }
