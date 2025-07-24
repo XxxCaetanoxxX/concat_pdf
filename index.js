@@ -53,10 +53,12 @@ function limparPDF(input, output) {
 }
 
 async function prepararPDFBuffer(pdfBuffer, originalName) {
+  //retornar o caminho do diretorio temporario padrao do sistema
   const tempDir = os.tmpdir();
 
-  const tempInputPath = path.join(tempDir, `${randomUUID()}-${originalName}`);
-  const tempOutputPath = path.join(tempDir, `cleaned-${originalName}`);
+  //gerar caminhos temporarios no sistema
+  const tempInputPath = path.join(tempDir, `${randomUUID()}-${originalName}`); //caminho temporario pdf original
+  const tempOutputPath = path.join(tempDir, `cleaned-${originalName}`);//caminho temporario pdf limpo
 
   // Salva o buffer em um arquivo temporário
   await fs.writeFile(tempInputPath, pdfBuffer);
@@ -75,9 +77,9 @@ async function prepararPDFBuffer(pdfBuffer, originalName) {
   // Lê o PDF final como buffer de volta (limpo ou original)
   const resultBuffer = await fs.readFile(finalPath);
 
-  // Opcional: deletar arquivos temporários
-  // await fs.unlink(tempInputPath);
-  // if (isEncrypted) await fs.unlink(tempOutputPath);
+  //deletar arquivos temporários
+  await fs.unlink(tempInputPath);
+  if (isEncrypted) await fs.unlink(tempOutputPath);
 
   return resultBuffer;
 }
